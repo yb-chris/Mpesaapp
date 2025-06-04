@@ -72,7 +72,7 @@ def stk_push(request):
             "PartyA": phone,
             "PartyB": SHORTCODE,
             "PhoneNumber": phone,
-            "CallbackURL": f"{NGROK_URL}/callback",
+            "CallBackURL": f"{NGROK_URL}/callback/",
             "AccountReference": f"Transaction_{transaction.id}",
             "TransactionDesc": "Payment Request",
         }
@@ -83,7 +83,7 @@ def stk_push(request):
         print(response_data)
         #update the transaction with current status frm resp.
         transaction_id = response_data.get(
-            'CheckoutRequestId',None)
+            'CheckoutRequestID',None)
         transaction.transaction_id = transaction_id
         transaction.description = response_data.get(
             'ResponseDescription',"No Description"
@@ -100,7 +100,7 @@ def stk_push(request):
 def waiting_page(request, transaction_id):
     transaction = Transaction.objects.get(id = transaction_id)
     return render(request, 'waiting.html',
-                  {'transanction_id': transaction_id})
+                  {'transaction_id': transaction_id})
 
 
 ### CALLBACK METHOD L: THIS METHOD WILL FETCH OUR RESULTS FOR A TRANSACTION
@@ -114,7 +114,7 @@ def callback(request):
             stk_callback = data.get('Body',{}).get('stkCallback',{})
             result_code = stk_callback.get('ResultCode',None)
             result_desc = stk_callback.get('ResultDesc','')
-            transaction_id  = stk_callback.get('CheckoutRequestId',None)
+            transaction_id  = stk_callback.get('CheckoutRequestID',None)
             print("callback result")
             print(transaction_id,result_code)
             # we now check the transaction result . i.e. did user pay or not
@@ -181,7 +181,30 @@ def callback(request):
                         status=400)
 ### Check status will enable us to track the status of a transaction
 def check_status(request, transaction_id):
-    pass
+    transaction = Transaction.objects.filter(id = transaction_id).first()
+    if not transation:
+        return JsonResponse({"status": "failed","message":
+                             "Transaction no found!"}, status=400)
+    '''
+    -on stk push method -> transaction status is pending
+    -on successful payment -> transaction status is successful
+    -on failed payment -> transaction status is failed
+    -on cancelled payment -> transaction status is cancelled
+    '''
+    if transation.status == "Success":
+        return JsonResponse({"status": "success","message":
+                             "payment Successful"}, status=200)
+    elif transation.status == "Failed":
+        return JsonResponse({"status": "failed","message":
+                             "payment Failed"}, status=200)
+    elif transation.status == "Cancelled":
+        return JsonResponse({"status": "cancelled","message":
+                             "transaction cancelled"}, status=200)
+    else:
+        return JsonResponse({"status": "pending","message":
+                             "transaction pending"}, status=200)
+
+
 
 def payment_success(request):
     return render(request,'payment_success.html')
